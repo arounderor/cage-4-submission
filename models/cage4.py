@@ -9,9 +9,10 @@ from models.utils import combine_marl_states
 
 MAX_SERVERS = 6
 MAX_USERS = 10
+#TODO MAX_EDGES
 MAX_EDGES = 8
 
-
+ 
 def pad_sequence(seq, lens, padding):
     padded = torch.zeros(lens.size(0), padding, seq.size(-1))
     mask = torch.ones(padded.size(0), padded.size(1))

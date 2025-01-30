@@ -97,7 +97,7 @@ def evaluate_one_episode(cyborg, wrapped_cyborg, agent, write_to_file, i,tot):
     total_reward = sum(r)
     return total_reward, a, o
 
-def run_evaluation_parallel(submission, log_path, max_eps=100, write_to_file=False, seed=None, workers=32):
+def run_evaluation_parallel(submission, log_path, max_eps=100, write_to_file=True, seed=None, workers=32):
     cyborg_version = CYBORG_VERSION
     EPISODE_LENGTH = 500
     scenario = "Scenario4"
@@ -204,7 +204,7 @@ def run_evaluation_parallel(submission, log_path, max_eps=100, write_to_file=Fal
             scores.write(f"reward_mean: {reward_mean}\n")
             scores.write(f"reward_stdev: {reward_stdev}\n")
 
-def run_evaluation(submission, log_path, max_eps=100, write_to_file=False, seed=None):
+def run_evaluation(submission, log_path, max_eps=100, write_to_file=True, seed=None):
     cyborg_version = CYBORG_VERSION
     EPISODE_LENGTH = 500
     scenario = "Scenario4"
@@ -243,6 +243,7 @@ def run_evaluation(submission, log_path, max_eps=100, write_to_file=False, seed=
         a = []
         o = []
         count = 0
+        
         for j in range(EPISODE_LENGTH):
             actions = {
                 agent_name: agent.get_action(
