@@ -9,7 +9,9 @@ ROUTERS = [r+'_router' for r in ROUTERS]
 
 # How many bits are used in each subnet feature block
 SN_BLOCK_SIZE = 4*3 + 23*2 # 3*子网数+2*最大主机数（18+5）   
-
+#子网数、最大主机数
+S = 4
+N = 23
 #先取消，graph_wrapper的_parse_tabular()待调整
 # Who can talk to whom without an internet connection 
 # ACCESSABLE_OFFLINE = {
@@ -36,7 +38,7 @@ MY_SUBNETS = {
 # MAX_SERVERS = 6
 # MAX_USERS = 10 
 MAX_HOSTS = 23
-POSSIBLE_NEIGHBORS = 34 #计算边动作参数的参数，一共35个设备（不包括交换设备）
+POSSIBLE_DIRECTED_LINKS = 1587 #计算边动作参数的参数，一共23*3*23
 
 from CybORG.Simulator.Actions import Analyse, Remove, Restore, DeployDecoy, Monitor
 from CybORG.Simulator.Actions.ConcreteActions.ControlTraffic import BlockTraffic, AllowTraffic
@@ -49,5 +51,5 @@ N_EDGE_ACTIONS = len(EDGE_ACTIONS)
 N_GLOBAL_ACTIONS = len(GLOBAL_ACTIONS) 
 MAX_ACTIONS = \
     N_NODE_ACTIONS*(MAX_HOSTS) + \
-    N_EDGE_ACTIONS*POSSIBLE_NEIGHBORS + \
+    N_EDGE_ACTIONS*POSSIBLE_DIRECTED_LINKS + \
     N_GLOBAL_ACTIONS

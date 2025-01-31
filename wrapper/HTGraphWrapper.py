@@ -38,7 +38,7 @@ class GraphWrapper(EnterpriseMAE):
 
         agent_id = int(agent_name[-1]) # 0
         #TODO
-        #这里子网顺序注意一下 应该要和观测的子网顺序一致
+        #这里MY_SUBNETS中子网顺序注意一下 应该要和观测的子网顺序一致
         #flatwrapper里是从仿真器state里提取子网名编码的
         #先保证场景构建文件和globals文件中子网名顺序一致
         which_subnet = MY_SUBNETS[agent_id][a_id // MAX_ACTIONS]
@@ -57,15 +57,23 @@ class GraphWrapper(EnterpriseMAE):
             return a(session=session, agent=agent_name, hostname=target)
 
         # Edge action
-        #TODO在HTglobal中添加一个全部设备名称和ip的字典（size为35），没有ip的值为None。替换“[r for r in ROUTERS if which_subnet not in r]”
-        #按照子网顺序、服务器主机顺序添加到列表
-        elif (a_id := a_id - (N_NODE_ACTIONS*MAX_HOSTS)) < (N_EDGE_ACTIONS*POSSIBLE_NEIGHBORS):
-            a = EDGE_ACTIONS[a_id // POSSIBLE_NEIGHBORS]
-            target = [r for r in ROUTERS if which_subnet not in r][a_id % POSSIBLE_NEIGHBORS]
-            #假设这个字典名为device_ips
-            #target = [ip for ip in device_ips.values() if  not ip]
+        elif (a_id := a_id - (N_NODE_ACTIONS*MAX_HOSTS)) < (N_EDGE_ACTIONS*POSSIBLE_DIRECTED_LINKS):
+            a = EDGE_ACTIONS[a_id // POSSIBLE_DIRECTED_LINKS]
+            # target = [r for r in ROUTERS if which_subnet not in r][a_id % POSSIBLE_DIRECTED_LINKS]
+            if (a_id % MAX_HOSTS) > 5:
+                dsthost = f'{which_subnet}_user_host_{(a_id % MAX_HOSTS)-6}'
+            else:
+                dsthost = f'{which_subnet}_server_host_{(a_id % MAX_HOSTS)}'
+
+            srcSubnet = MY_SUBNETS[agent_id].remove(which_subnet)
+            srcSubnet = srcSubnet[(a_id // MAX_HOSTS) // MAX_HOSTS]
+            srcindex = (a_id // MAX_HOSTS) % MAX_HOSTS
+            if (srcindex) > 5:
+                srchost = f'{which_subnet}_user_host_{(srcindex)-6}'
+            else:
+                srchost = f'{which_subnet}_server_host_{srcindex}'
         #现在是allowTraffic和blockTraffic动作
-            return a(session, agent_name, target.replace('_router',''), which_subnet)
+            return a(session, agent_name, srchost, dsthost)
 
         # Global action (only one)
         else:
@@ -93,7 +101,7 @@ class GraphWrapper(EnterpriseMAE):
 
         # Tell ObservationGraph what happened and update
         graph_obs = dict()
-        for i in range(5):
+        for i in range(N_AGENTS):
             agent = f'blue_agent_{i}'
             o = observation[agent]
             g = self.graphs[agent]
@@ -106,17 +114,7 @@ class GraphWrapper(EnterpriseMAE):
             # Indicates if msg was recieved or comms are blocked
             # This way we differentiate between feature for 0 and unknown
             recieved_msg = msg[:, -1:]
-            if i != 4:
-                # Repeat agent 4's 'is_recieved' message across 2 more subnets
-                recieved_msg = np.concatenate([recieved_msg, np.zeros((2,1))], axis=0)
-                recieved_msg[-2:] = recieved_msg[-3]
-
-                # Pull out messages for 'was_scanned' and 'was_comprimised'
-                msg_small = msg[:-1, :2]
-                msg_big = msg[-1, :6].reshape(3,2)
-                msg = np.concatenate([msg_small, msg_big], axis=0)
-            else:
-                msg = msg[:, :2]
+            msg = msg[:, :2]
 
             msg = np.concatenate([msg, recieved_msg], axis=1)
 
@@ -206,11 +204,11 @@ class GraphWrapper(EnterpriseMAE):
         
         Mission phase           (1d, 0,1, or 2)
         Subnet info (x8)
-            Subnet id           (9d)
-            Blocked subnets     (9d)
-            Comm policy         (9d)
-            Comprimised hosts   (16d)
-            Scanned hosts       (16d)
+            Subnet id           (9d)->(4d)
+            Blocked subnets     (9d)->(4d)
+            Comm policy         (9d)->(4d)
+            Comprimised hosts   (16d)->(23d)
+            Scanned hosts       (16d)->(23d)
         Messages (4x8)
 
         We pull out the host data and append it to the host nodes, 
@@ -234,19 +232,9 @@ class GraphWrapper(EnterpriseMAE):
             block = sn_block[SN_BLOCK_SIZE*i : SN_BLOCK_SIZE*(i+1)]
 
             # Pull out edges between subnets
-            sn = block[:18]
-            me = ROUTERS[ sn[:9].nonzero()[0][0] ]
-            can_maybe_connect_to = (sn[9:18] == 0).nonzero()[0]
-
-            # Logic for subnet routing 
-            if INTERNET in can_maybe_connect_to:
-                can_connect_to = [ROUTERS[i] for i in can_maybe_connect_to]
-            else:
-                # Can connect to anything in LAN
-                can_connect_to = [
-                    ROUTERS[i] for i in can_maybe_connect_to
-                    if ROUTERS[i] in ACCESSABLE_OFFLINE[me]
-                ]
+            sn = block[:2*S]
+            me = ROUTERS[ sn[:S].nonzero()[0][0] ]
+            can_connect_to = (sn[S:2*S] == 0).nonzero()[0]
 
             router_name = me
             me = [me] * len(can_connect_to)
@@ -254,7 +242,7 @@ class GraphWrapper(EnterpriseMAE):
             dst += me
 
             # Pull out features for servers/hosts that exist
-            hosts = torch.from_numpy(block[27:]).reshape(2,16).T
+            hosts = torch.from_numpy(block[3*S:]).reshape(2,N).T
             n_srv, n_usr = g.subnet_size[router_name]
             srv_idx = list(range(n_srv))
             usr_idx = list(range(6,n_usr+6))
